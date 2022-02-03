@@ -6,7 +6,6 @@
         Forest,
         Rock,
         Moutain,
-        Building,
-        Unit
+        Building
     }
 }

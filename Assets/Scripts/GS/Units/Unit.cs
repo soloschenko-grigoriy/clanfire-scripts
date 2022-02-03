@@ -1,101 +1,165 @@
-using System;
-using System.Threading.Tasks;
-using GS.StateMachina;
+﻿using System.Collections.Generic;
+using GS.Hex;
+using GS.Players;
+using GS.Units.Animators;
 using UnityEngine;
-using UnityEngine.Events;
 
 namespace GS.Units
 {
-    [RequireComponent(typeof(UnitMovement), typeof(StateMachine), typeof(UnitActivity)), SelectionBase]
-    public class Unit : MonoBehaviour, IUnitTarget
+    public class Unit : MonoBehaviour, IUnit
     {
-        [SerializeField] private GameObject selectedGO;
+        [SerializeField] private GameObject selectedPointer;
         [SerializeField] private UnitConfig config;
-
-        public UnitsManager Manager => _manager;
-        public bool IsSelected { get; private set; }
-        public float Health { get; private set; }
-        public int HealthCapacity => config.HealthCapacity;
-        public UnitConfig Config => config;
-        public Vector3 Position => transform.position;
-        public bool IsAvailable { get; private set; }
         
-        private UnitsManager _manager;
+        public IHexCell Destination => _destination;
+        public List<IHexCell> CurrentPath => _currentPath;
+        public IHexCell Cell => _cell;
+        public GameObject GameObject => gameObject;
+        public Vector3 Position
+        {
+            get => transform.position;
+            set => transform.position = value;
+        }
+
+        private HexCell _cell;
+        private bool _isSelected;
+        private bool _movementInProgress;
+        private HexCell _destination;
         private UnitMovement _movement;
-        private UnitActivity _unitActivity;
-        private CapsuleCollider _collider;
+        private IUnitAnimator _unitAnimator;
+        private List<IHexCell> _accessibleCells = new List<IHexCell>();
+        private List<IHexCell> _currentPath = new List<IHexCell>();
+        private PlayerBehaviour _playerBehaviour;
 
-        private void Awake()
+        private void OnEnable()
         {
-            _movement = GetComponent<UnitMovement>();
-            _unitActivity = GetComponent<UnitActivity>();
-            _collider = GetComponent<CapsuleCollider>();
-        }
-
-        public void Spawn(Vector3 at, UnitsManager by, int avoidance)
-        {
-            _manager = by;
-            transform.position = at;
-            Health = config.HealthCapacity;
-            IsAvailable = true;
-            _movement.AssignAvoidancePriority(avoidance);
-        }
-        
-        public void MarchTowards(Vector3 dest)
-        {
-            _unitActivity.RemoveTarget(false);
-            _movement.SetDestination(dest, _manager.SelectedUnits.Count);
-        }
-        
-        public void StopMarching()
-        {
-            _movement.Stop();
-        }
-        
-        public void SetTarget(Unit foe)
-        {
-            _unitActivity.SetTarget(foe, false);
-            _movement.SetDestination(foe.transform.position, _manager.SelectedUnits.Count);
+            _movement ??= GetComponent<UnitMovement>();
+            _unitAnimator ??= GetComponent<IUnitAnimator>();
         }
 
-        public void SetSelected(bool value)
+        private void Update()
         {
-            selectedGO.SetActive(value);
-            IsSelected = value;
-        }
-
-        public PlayerRelationship GetRelationshipTo(PlayerController playerController)
-        {
-            if (playerController == _manager.PlayerController)
+            if (_movement.InProgress)
             {
-                return PlayerRelationship.Same;
-            }
-
-            // @Todo: introduce more cases when Diplomacy is implemented
-            return PlayerRelationship.Foe;
-        }
-        
-        public PlayerRelationship GetRelationshipTo(Unit unit)
-        {
-            return GetRelationshipTo(unit._manager.PlayerController);
-        }
-
-        public void TakeDamage(float value)
-        {
-            Health -= value;
-
-            if (Health <= 0)
-            {
-                Die();
+                _movement.MakeProgress(Time.time);
             }
         }
 
-        private async void Die()
+        public void Spawn(HexCell on, IPlayer player)
         {
-            IsAvailable = false;
-            _collider.enabled = false;
-            await Task.Delay(TimeSpan.FromSeconds(2));
-            _manager.Recycle(this);
+            SetCell(on);
+            _playerBehaviour = player.PlayerBehaviour;
+        }
+
+        public void SetCell(IHexCell cell)
+        {
+            // Cleanup first
+            _cell?.RemoveUnit();
+
+            _cell = cell as HexCell;
+            transform.position = cell.Position;
+            
+            cell.SetUnit(this);
+        }
+
+        public void TrySetDestination(IHexCell cell)
+        {
+            _currentPath.ForEach(c => {
+                c.IsOnPath = false;
+                c.Refresh();
+            });
+            
+            var path = HexPathFinder.FindPath(_cell, cell);
+            if (path.Count > 0)
+            {
+                _destination = cell as HexCell;
+                _currentPath = path;
+                
+                _destination.IsHighlightedAsDestination = true;
+            
+                // current is not actually part of the path but still should be highlighted
+                _cell.IsOnPath = true;
+                _cell.Refresh();
+                
+                _currentPath.ForEach(c => c.IsOnPath = true);
+                _currentPath.ForEach(c => c.Refresh()); // we have to do this in 2 separate calls otherwise border may not render properly
+            }
+        }
+
+        public void StartMovingTowardsDestination()
+        {
+            if (Destination == null)
+            {
+                return;
+            }
+            
+            _movement.StartMoving(this, config.MovementDuration);
+            
+            // TODO should be controlled by state machine independently from this
+            _unitAnimator.ChangeState(UnitAnimatorState.Moving);
+            
+            DeSelect();
+        }
+
+        public void ResetDestination()
+        {
+            _destination = null;
+        }
+
+        public void Select()
+        {
+            _isSelected = true;
+            selectedPointer.gameObject.SetActive(_isSelected);
+            HighlightAccessibleHexes();
+            HighlightDestination();
+        }
+
+        public void DeSelect()
+        {
+            _isSelected = false;
+            selectedPointer.gameObject.SetActive(_isSelected);
+            
+            DeHighlightHexes();
+            DeHighlightDestination();
+        }
+        
+        private void HighlightDestination()
+        {
+            if (_destination == null)
+            {
+                return;
+            }
+
+            _destination.IsHighlightedAsDestination = true;
+            _destination.Refresh();
+        }
+
+        private void DeHighlightDestination()
+        {
+            if (_destination == null)
+            {
+                return;
+            }
+            
+            _destination.IsHighlightedAsDestination = false;
+            _destination.Refresh();
+        }
+
+        private void HighlightAccessibleHexes()
+        {
+            _accessibleCells = _cell.GetAccessibleIn(config.MovementRadius);
+            _accessibleCells.ForEach(cell => cell.IsHighlightedAsAccessible = true);
+            _accessibleCells.ForEach(cell => cell.Refresh()); // we have to do this in 2 separate calls otherwise border may not render properly
+        }
+
+        private void DeHighlightHexes()
+        {
+            _accessibleCells.ForEach(cell => {
+                cell.IsHighlightedAsAccessible = false;
+                cell.IsOnPath = false;
+                cell.ResetDistance();
+                cell.Refresh();
+            });
         }
     }
 }

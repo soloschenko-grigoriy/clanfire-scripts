@@ -1,87 +1,103 @@
-﻿using System.Linq;
-using Castle.Core.Internal;
-using GS.Units.Helpers;
+﻿using System;
+using System.Linq;
+using GS.Hex;
+using GS.Units.Animators;
 using UnityEngine;
-using UnityEngine.AI;
 
 namespace GS.Units
 {
-    [RequireComponent(typeof(Unit))]
     public class UnitMovement : MonoBehaviour
     {
-        private NavMeshAgent _agent;
-        private Unit _unit;
-        private const int LayerMask = 1 << 7;
-        private const int MAXColliders = 100;
-
-        public bool DestinationIsSet { get; private set; }
+        public bool InProgress => _inProgress;
         
-        private void Awake()
+        private bool _inProgress;
+        private float _timeStarted;
+        private float _duration;
+
+        private IUnit _unit;
+        private IHexCell _currentCell;
+        private IHexCell _nextCell;
+        
+        // TODO Temp here
+        private IUnitAnimator _unitAnimator;
+
+        private void OnEnable()
         {
-            _agent = GetComponent<NavMeshAgent>();
-            _unit = GetComponent<Unit>();
+            _unitAnimator = GetComponent<IUnitAnimator>();
         }
 
-        private void Update()
+        public void StartMoving(IUnit unit, float duration)
         {
-            if (_agent.isStopped)
+            if (_inProgress)
             {
                 return;
             }
 
-            if (_agent.pathPending)
-            {
-                return;
-            }
+            _unit = unit;
+            _duration = duration;
+            _inProgress = true;
 
-            if (_agent.remainingDistance >= _agent.stoppingDistance)
-            {
-                return;
-            }
-
-            if (_agent.hasPath && _agent.velocity.sqrMagnitude != 0f)
-            {
-                return;
-            }
-
-            transform.LookAt(_agent.destination);
-            Stop();
+            ContinueToNextCell();
         }
 
-        public void AssignAvoidancePriority(int num)
+        public void MakeProgress(float currentTime)
         {
-            _agent.avoidancePriority = num;
+            float progress = (currentTime - _timeStarted) / _duration;
+            if (progress < 1)
+            {
+                _unit.Position = Vector3.Lerp(
+                    _currentCell.Position,
+                    _nextCell.Position,
+                    progress
+                );
+                return;
+            }
+
+            ContinueToNextCell();
         }
         
-        public void SetDestination(Vector3 dest, int numberOfAgents)
+        private void ContinueToNextCell()
         {
-            var hitColliders = new Collider[MAXColliders];
-            Physics.OverlapSphereNonAlloc(transform.position, _unit.Config.Awareness, hitColliders, LayerMask);
-            var numberOfAgentsNearby = hitColliders.FindAll(col => col != null).Length;
+            if (_nextCell != null)
+            {
+                _unit.SetCell(_nextCell);
+            }
+
+            CleanupCurrentCell();
+
+            if (_unit.CurrentPath.Count < 1)
+            {
+                CompleteMovement();
+                return;
+            }
+
+            SetupNextCell();
+
+            _timeStarted = Time.time;
+            transform.LookAt(_nextCell.Position);
+        }
+        
+        private void CleanupCurrentCell()
+        {
+            _currentCell = _unit.Cell;
+            _currentCell.IsOnPath = false;
+            _currentCell.IsHighlightedAsDestination = false;
+            _currentCell.Refresh();
+        }
+
+        private void SetupNextCell()
+        {
+            _nextCell = _unit.CurrentPath.Last();
+            _unit.CurrentPath.Remove(_nextCell);
+        }
+
+        private void CompleteMovement()
+        {
+            _inProgress = false;
+            _unit.ResetDestination();
             
-            _agent.SetDestination(dest);
-            // _agent.stoppingDistance = StoppingDistance.FindByKey(numberOfAgentsNearby);
-            DestinationIsSet = true;
+            // TODO Should be controlled by state machine directly
+            _unitAnimator.ChangeState(UnitAnimatorState.Idle);
         }
-
-        public void Go()
-        {
-            _agent.isStopped = false;
-        }
-
-        public void Stop()
-        {
-            transform.LookAt(_agent.destination);
-            _agent.isStopped = true;
-            DestinationIsSet = false;
-        }
-        
-#if UNITY_EDITOR
-
-        private void OnDrawGizmos()
-        {
-            Debug.DrawLine(transform.position, _agent.destination, Color.magenta);
-        }
-#endif
     }
 }

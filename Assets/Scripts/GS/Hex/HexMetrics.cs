@@ -12,7 +12,7 @@ namespace GS.Hex
         private const float SolidFactor = 0.75f;
         private const float BlendFactor = 1 - SolidFactor;
         
-        private const float BorderWidth = 0.01f;
+        private const float BorderWidth = 0.05f;
         private const float BorderSolidFactorWidth = 1 - BorderWidth;
         
         private static readonly Vector3[] CORNERS = {

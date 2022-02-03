@@ -3,11 +3,16 @@ using UnityEngine;
 
 namespace GS.Hex
 {
-    public class HexGridChunk : MonoBehaviour
+    public class HexGridChunk : MonoBehaviour, IRefreshable
     {
         [SerializeField] private Color[] colors;
+        [SerializeField] private Color pathBorderColor = new Color(0.75f, 0.75f, 0.75f);
+        [SerializeField] private Color highlightColor = new Color(0.66f, 0.20f, 0.92f);
 
         public Color[] Colors => colors;
+        public Color PathBorderColor => pathBorderColor;
+        public Color HighlightColor => highlightColor;
+        
         
         private HexCell[] _cells;
         private HexMesh _mesh;

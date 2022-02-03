@@ -81,13 +81,15 @@ namespace GS.Hex
             {
                 TriangulateConnection(direction, cell, v1, v2);
             }
-
-            AddBorder(direction, cell);
             
             if(direction <= HexDirection.SE)
             {
                 AddSlope(direction, cell);
             }
+
+            AddPillars(direction, cell);
+            AddHighlightBorder(direction, cell);
+            AddOnPathBorder(direction, cell);
         }
 
         private void TriangulateConnection(HexDirection direction, HexCell cell, Vector3 v1, Vector3 v2)
@@ -133,6 +135,117 @@ namespace GS.Hex
             AddTriangle(v2, v4, v2 + HexMetrics.GetBorder(direction.Next()));
             AddTriangleColor(Color.grey);
         }
+
+        private void AddOnPathBorder(HexDirection direction, HexCell cell)
+        {
+            if (!cell.IsOnPath)
+            {
+                return;
+            }
+            
+            var neighbor = cell.GetNeighbor(direction);
+            if (neighbor == null || neighbor.IsOnPath)
+            {
+                return;
+            }
+            
+            var center = cell.transform.localPosition;
+            var v1 = center + HexMetrics.GetBorderFirstSolidCorner(direction);
+            var v2 = center + HexMetrics.GetBorderSecondSolidCorner(direction);
+            var bridge = HexMetrics.GetBorder(direction);
+            var v3 = v1 + bridge;
+            var v4 = v2 + bridge;
+            
+            v1.y = v2.y = v3.y = v4.y = cell.Elevation + 0.01f;
+            var color = Color.grey;
+            
+            AddQuad(v1, v2, v3, v4);
+            AddQuadColor(color);
+            AddTriangle(v2, v4, v2 + HexMetrics.GetBorder(direction.Next()));
+            AddTriangleColor(color);
+        }
+
+        private void AddPillars(HexDirection direction, HexCell cell)
+        {
+            if (!cell.IsHighlightedAsAccessible)
+            {
+                return;
+            }
+            
+            if (cell.Elevation < 0)
+            {
+                return;
+            }
+            
+            var neighbor = cell.GetNeighbor(direction);
+            if (neighbor == null)
+            {
+                return;
+            }
+
+            var nextNeighbor = cell.GetNeighbor(direction.Next());
+            if (neighbor.Elevation > -1 && nextNeighbor.Elevation > -1)
+            {
+                return;
+            }
+
+            if (nextNeighbor.IsHighlightedAsAccessible == neighbor.IsHighlightedAsAccessible)
+            {
+                return;
+            }
+
+            if (!cell.IsHighlightedAsAccessible && neighbor.IsHighlightedAsAccessible == cell.IsHighlightedAsAccessible && nextNeighbor.Elevation > -1)
+            {
+                return;
+            }
+
+            if (cell.IsHighlightedAsAccessible == neighbor.IsHighlightedAsAccessible && nextNeighbor.Elevation < 0 && neighbor.Elevation > -1)
+            {
+                return;
+            }
+            
+            if (cell.IsHighlightedAsAccessible == nextNeighbor.IsHighlightedAsAccessible && neighbor.Elevation < 0 && nextNeighbor.Elevation > -1)
+            {
+                return;
+            }
+
+            if (!cell.IsHighlightedAsAccessible && cell.IsHighlightedAsAccessible != neighbor.IsHighlightedAsAccessible && nextNeighbor.Elevation < 0)
+            {
+                return;
+            }
+            
+            if (!cell.IsHighlightedAsAccessible && nextNeighbor.IsHighlightedAsAccessible && nextNeighbor.Elevation == neighbor.Elevation)
+            {
+                return;
+            }
+
+            var center = cell.transform.localPosition;
+            var v2 = center + HexMetrics.GetBorderSecondSolidCorner(direction);
+            var bridge = HexMetrics.GetBorder(direction);
+            var v4 = v2 + bridge;
+            var v5 = v2;
+            var v6 = v4;
+
+            v2.y = v4.y = cell.Elevation + 0.01f;
+
+            v5.y = v6.y = -1;
+            
+            AddQuad(v2, v4, v5, v6);
+            AddQuadColor(cell.HighlightColor);
+            
+            var v7 = v2 + HexMetrics.GetBorder(direction.Next());
+            var v8 = v7;
+            v8.y = -1;
+            
+            AddQuad(v4, v7, v6, v8);
+            AddQuadColor(cell.HighlightColor);
+            
+            AddQuad(v7, v2, v8, v5);
+            AddQuadColor(cell.HighlightColor);
+            
+            AddTriangle(v2, v4, v2 + HexMetrics.GetBorder(direction.Next()));
+            AddTriangleColor(cell.HighlightColor);
+        }
         
         private void AddSlope(HexDirection direction, HexCell cell)
         {
@@ -147,13 +260,38 @@ namespace GS.Hex
             var v2 = center + HexMetrics.GetSecondCorner(direction);
             var v3 = v1;
             var v4 = v2;
-            
-            v1.y = v2.y = v3.y = v4.y = cell.Elevation + 0.01f;
+
+            v1.y = v2.y = v3.y = v4.y = cell.Elevation; // + 0.01f;
             
             v3.y = v4.y = neighbor.Elevation;
             
             AddQuad(v1, v2, v3, v4);
             AddQuadColor(Color.grey);
+        }
+
+        private void AddHighlightBorder(HexDirection direction, HexCell cell)
+        {
+            var neighbor = cell.GetNeighbor(direction);
+            
+            if (!cell.IsHighlightedAsAccessible || neighbor.IsHighlightedAsAccessible)
+            {
+                return;
+            }
+
+            var center = cell.transform.localPosition;
+
+            var v1 = center + HexMetrics.GetBorderFirstSolidCorner(direction);
+            var v2 = center + HexMetrics.GetBorderSecondSolidCorner(direction);
+            var bridge = HexMetrics.GetBorder(direction);
+            var v3 = v1 + bridge;
+            var v4 = v2 + bridge;
+            
+            v1.y = v2.y = v3.y = v4.y = cell.Elevation + 0.01f;
+            
+            AddQuad(v1, v2, v3, v4);
+            AddQuadColor(cell.HighlightColor);
+            AddTriangle(v2, v4, v2 + HexMetrics.GetBorder(direction.Next()));
+            AddTriangleColor(cell.HighlightColor);
         }
         
         private void AddTriangle(Vector3 v1, Vector3 v2, Vector3 v3)

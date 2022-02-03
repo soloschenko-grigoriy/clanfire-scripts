@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 9122459117420874740}
   - component: {fileID: 9122459117420874741}
   - component: {fileID: 9122459117420874738}
-  - component: {fileID: 2666226533329860652}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -143,16 +142,3 @@ MonoBehaviour:
   rotateLeftKey: 122
   useMouseRotation: 1
   mouseRotationKey: 324
---- !u!114 &2666226533329860652
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9122459117420874742}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b756cfa199a24658a5386dc273b48794, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxHitDistance: 500

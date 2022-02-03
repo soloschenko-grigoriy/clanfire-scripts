@@ -92,7 +92,7 @@ namespace GS.Hex
 
         private void CreateLandMass(int budget) {
             var center = grid.GetRandomCell();
-            var frontier = new PriorityQueue<HexCell>();
+            var frontier = new PriorityQueue<IHexCell>();
             frontier.Enqueue(center, 0);
             
             while (frontier.Count > 0 && budget > 0) {
@@ -108,7 +108,7 @@ namespace GS.Hex
                 budget--;
                 
                 foreach (var next in current.Neighbors) {
-                    if (!next) {
+                    if (next == null) {
                         continue;
                     }
 

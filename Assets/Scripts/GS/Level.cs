@@ -1,21 +1,24 @@
-﻿using System;
-using GS.Hex;
+﻿using GS.Hex;
+using GS.Players;
 using UnityEngine;
 
 namespace GS
 {
+    [RequireComponent(typeof(HexMapSaver))]
     public class Level : MonoBehaviour
     {
-        private HexMapSaver _mapSaver;
-
+        private PlayerBehaviour[] _players;
+        private PlayerBehaviour _currentPlayerBehaviour;
+        
         private void Awake()
         {
-            _mapSaver = GetComponent<HexMapSaver>();
+            GetComponent<HexMapSaver>().LoadMap();
         }
 
         private void Start()
         {
-            _mapSaver.LoadMap();
+            _players = GetComponentsInChildren<PlayerBehaviour>();
+            _players[0].Player.SetAsCurrent();
         }
     }
 }

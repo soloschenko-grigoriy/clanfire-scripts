@@ -4,7 +4,13 @@ using UnityEngine.UI;
 
 namespace GS.Hex
 {
-    public class HexGrid : MonoBehaviour
+    public interface IHexGrid: IIsGameObject
+    {
+        IHexCell GetCell(Vector3 point);
+        HexCell GetCell(HexCoordinates coordinates);
+    }
+    
+    public class HexGrid : MonoBehaviour, IRefreshable, IHexGrid
     {
         [SerializeField] private int chunkCountX = 4;
         [SerializeField] private int chunkCountZ = 4;
@@ -16,7 +22,8 @@ namespace GS.Hex
         
         public HexCell[] Cells => _cells;
         public HexGridChunk[] Chunks => _chunks;
-
+        public GameObject GameObject => gameObject;
+        
         private HexCell[] _cells;
         private HexGridChunk[] _chunks;
         private Canvas _canvas;
@@ -38,17 +45,17 @@ namespace GS.Hex
         {
             var cell = GetCell(point);
             ChangeCell(cell, category);
-            cell.Chunk.Refresh();
+            cell.Refresh();
         }
         
         public void ChangeCell(Vector3 point, HexCellObjectType type)
         {
             var cell = GetCell(point);
             ChangeCell(cell, type);
-            cell.Chunk.Refresh();
+            cell.Refresh();
         }
 
-        public void ChangeCell(HexCell cell, HexCellCategory category)
+        public void ChangeCell(IHexCell cell, HexCellCategory category)
         {
             if (cell.HasContents)
             {
@@ -60,7 +67,7 @@ namespace GS.Hex
             cell.SetElevation(category == HexCellCategory.DeepWater || category == HexCellCategory.ShallowWater ? -1 : 0);
         }
         
-        public void ChangeCell(HexCell cell, HexCellObjectType type)
+        public void ChangeCell(IHexCell cell, HexCellObjectType type)
         {
             var category = cell.Category;
             if (type == HexCellObjectType.Building)
@@ -71,9 +78,13 @@ namespace GS.Hex
             {
                 category = HexCellCategory.Grass;
             }
-            else if (type == HexCellObjectType.Rock || type == HexCellObjectType.Moutain)
+            else if (type == HexCellObjectType.Rock)
             {
                 category = HexCellCategory.Rock;
+            } 
+            else if (type == HexCellObjectType.Moutain)
+            {
+                category = HexCellCategory.Mountain;
             }
 
             cell.SetCategory(category);
@@ -99,13 +110,18 @@ namespace GS.Hex
             }
         }
         
-        public HexCell GetCell(Vector3 point)
+        public IHexCell GetCell(Vector3 point)
         {
             var pos = transform.InverseTransformPoint(point);
             var coordinates = HexCoordinates.FromPosition(pos);
             var index = GetIndex(coordinates);
-            
+
             return _cells[index];
+        }
+        
+        public HexCell GetCell(HexCoordinates coordinates)
+        {
+            return _cells[GetIndex(coordinates)];
         }
         
         private void CreateChunks()
